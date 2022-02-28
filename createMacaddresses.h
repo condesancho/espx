@@ -6,15 +6,12 @@
 
 #include "utilities.h"
 
-struct uint48 {
-    uint64_t x : 48;
-} __attribute__((packed));
-
-void createMacaddresses() {
+void createMacaddresses()
+{
     srand(time(NULL));
 
-    FILE *f;
-
+    FILE* f;
+    // Create macaddress.bin file to store the random generated mac addresses
     f = fopen("macaddress.bin", "w");
 
     if (f == NULL) {
@@ -22,13 +19,14 @@ void createMacaddresses() {
         exit(-1);
     }
 
-    for (int i = 0; i < NUM_OF_SAMPLES; i++) {
-        uint64_t address = pow(2, 17) * (uint64_t)rand();
+    // Mac address is a 6 byte array of unsigned chars
+    unsigned char mac[6];
+    for (int i = 0; i < SAMPLES; i++) {
+        for (int j = 0; j < 6; j++) {
+            mac[j] = rand() % 256;
+        }
 
-        struct uint48 mac;
-        mac.x = address;
-
-        fwrite(&mac, sizeof(struct uint48), 1, f);
+        fwrite(&mac, 6 * sizeof(unsigned char), 1, f);
     }
 
     fclose(f);
