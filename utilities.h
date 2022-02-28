@@ -40,11 +40,17 @@ typedef struct {
 typedef struct {
     contact* buf;
     int buf_size;
+    int num_of_items;
     long head, tail;
     int full, empty;
     pthread_mutex_t* mut;
     pthread_cond_t *notFull, *notEmpty;
 } queue;
+
+struct pthread_args {
+    queue* close_cont_q;
+    queue* recent_cont_q;
+};
 
 /**
  * Queue functions
@@ -59,6 +65,7 @@ queue* queueInit(int buf_size)
 
     q->buf_size = buf_size;
     q->buf = (contact*)malloc(buf_size * sizeof(contact));
+    q->num_of_items = 0;
     q->empty = 1;
     q->full = 0;
     q->head = 0;
@@ -87,9 +94,16 @@ void queueDelete(queue* q)
 
 void queueAdd(queue* q, contact in)
 {
+    if (q->full == 1) {
+        printf("Queue is full\nError\n");
+        exit(-1);
+    }
+
     q->buf[q->tail] = in;
     q->tail++;
-    if (q->tail == QUEUESIZE)
+    q->num_of_items++;
+
+    if (q->tail == q->buf_size)
         q->tail = 0;
     if (q->tail == q->head)
         q->full = 1;
@@ -100,10 +114,15 @@ void queueAdd(queue* q, contact in)
 
 void queueDel(queue* q, contact* out)
 {
+    if (q->empty == 1) {
+        printf("Queue is empty\nError\n");
+        exit(-1);
+    }
     *out = q->buf[q->head];
 
+    q->num_of_items--;
     q->head++;
-    if (q->head == QUEUESIZE)
+    if (q->head == q->buf_size)
         q->head = 0;
     if (q->head == q->tail)
         q->empty = 1;

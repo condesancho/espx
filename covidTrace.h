@@ -3,14 +3,23 @@
 
 #include "utilities.h"
 
+/**
+ * Global variables
+ **/
 // Used for the testCOVID function
 bool first_time = true;
 
-int condition = 0;
+pthread_mutex_t bt_mutex, covid_mutex, term_mutex;
+pthread_cond_t bt_cond, covid_cond, term_cond;
 
-pthread_mutex_t condition_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t condition_cond = PTHREAD_COND_INITIALIZER;
+// Extra variables for conditions
+int bt_condition = 0;
+int covid_condition = 0;
+int term_condition = 0;
 
+/**
+ * Functions used by pthread functions
+ */
 // Returns random macaddress from an array of addressess
 macaddress BTnearMe(macaddress* addresses)
 {
@@ -38,45 +47,95 @@ bool testCOVID()
     return positive_test;
 }
 
+void uploadContacts(queue* close_contacts)
+{
+    // If file doesn't exist create it and write
+    FILE* fp = fopen("possible_covid_cases.bin", "ab+");
+
+    if (close_contacts->empty == 1) {
+        fclose(fp);
+        return NULL;
+    }
+
+    contact out;
+
+    int num_of_iterations = close_contacts->num_of_items;
+    for (int i = 0; i < num_of_iterations; i++) {
+        queueDel(close_contacts, &out);
+        fwrite(&out, sizeof(contact), 1, fp);
+    }
+    fclose(fp);
+
+    return NULL;
+}
+
+/**
+ * Pthread functions
+ */
 void* timer(void* args)
 {
     // Stores the starting time
-    struct timeval start_time;
-    gettimeofday(&start_time, NULL);
+    struct timeval bluetooth_time, covid_time, termination_time;
+    gettimeofday(&bluetooth_time, NULL);
+    covid_time = bluetooth_time;
+    termination_time = bluetooth_time;
 
     struct timeval current_time;
     double time_diff = 0;
 
     while (1) {
-
+        // Stores the current time
         gettimeofday(&current_time, NULL);
-        time_diff = (double)(current_time.tv_sec - start_time.tv_sec) * 1e6;
-        time_diff += (current_time.tv_usec - start_time.tv_usec);
-        // Time passed in seconds
+
+        // Time passed for bt search
+        time_diff = (double)(current_time.tv_sec - bluetooth_time.tv_sec) * 1e6;
+        time_diff += (current_time.tv_usec - bluetooth_time.tv_usec);
         time_diff = time_diff / 1e6;
 
-        if (time_diff >= 10) {
+        pthread_mutex_lock(&bt_mutex);
+        if (time_diff >= BT_SEARCH_TIME && bt_condition == 0) {
+
+            bt_condition = 1;
+            pthread_cond_signal(&bt_cond);
+
+            // Reset timer
+            gettimeofday(&bluetooth_time, NULL);
+        }
+        pthread_mutex_unlock(&bt_cond);
+
+        // Time passed for covid test
+        time_diff = (double)(current_time.tv_sec - covid_time.tv_sec) * 1e6;
+        time_diff += (current_time.tv_usec - covid_time.tv_usec);
+        time_diff = time_diff / 1e6;
+
+        pthread_mutex_lock(&bt_mutex);
+        if (time_diff >= COVID_TEST_TIME && covid_condition == 0) {
+
+            covid_condition = 1;
+            pthread_cond_signal(&covid_cond);
+
+            // Reset timer
+            gettimeofday(&covid_time, NULL);
+        }
+        pthread_mutex_unlock(&bt_cond);
+
+        // Time passed for the termination of the program
+        time_diff = (double)(current_time.tv_sec - termination_time.tv_sec) * 1e6;
+        time_diff += (current_time.tv_usec - termination_time.tv_usec);
+        time_diff = time_diff / 1e6;
+
+        pthread_mutex_lock(&term_mutex);
+        if (time_diff >= TERMINATION_TIME && term_condition == 0) {
+
+            term_condition = 1;
+            pthread_cond_signal(&term_condition);
             pthread_exit(NULL);
         }
-
-        pthread_mutex_lock(&condition_mutex);
-        if (time_diff >= 5) {
-            condition = 1;
-            pthread_cond_signal(&condition_cond);
-        }
-        pthread_mutex_unlock(&condition_mutex);
+        pthread_mutex_unlock(&term_mutex);
     }
 }
 
-void* wake_up(void* args)
+void* bluetooth_search(void* args)
 {
-    // pthread_mutex_lock(&condition_mutex);
-    while (!condition) {
-        pthread_cond_wait(&condition_cond, &condition_mutex);
-    }
-    // pthread_mutex_lock(&condition_mutex);
-
-    printf("Wake up\n");
 }
-
 #endif
