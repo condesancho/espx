@@ -20,13 +20,13 @@ void createMacaddresses()
     }
 
     // Mac address is a 6 byte array of unsigned chars
-    unsigned char mac[6];
+    macaddress mac;
     for (int i = 0; i < SAMPLES; i++) {
         for (int j = 0; j < 6; j++) {
-            mac[j] = rand() % 256;
+            mac.mac[j] = rand() % 256;
         }
 
-        fwrite(&mac, 6 * sizeof(unsigned char), 1, f);
+        fwrite(&mac, sizeof(macaddress), 1, f);
     }
 
     fclose(f);

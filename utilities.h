@@ -14,15 +14,15 @@
 // The time intervals needed, sped up by 100
 #define TERMINATION_TIME 30 * 24 * 60 * 60 / 100 // 30 days in seconds
 #define BT_SEARCH_TIME 10 / 100 // 10 seconds
-#define MIN_CLOSE_CONTACT_TIME 4 * 60 / 100 // 4 minutes in seconds
-#define MAX_CLOSE_CONTACT_TIME 20 * 60 / 100 // 20 minutes in seconds
+#define MIN_CONTACT_TIME 4 * 60 / 100 // 4 minutes in seconds
+#define MAX_CONTACT_TIME 20 * 60 / 100 // 20 minutes in seconds
 #define REMEMBER_TIME 14 * 24 * 60 * 60 / 100 // 14 days in seconds
 #define COVID_TEST_TIME 4 * 60 * 60 / 100 // 4 hours in seconds
 
 // The number of macaddresses created
 #define SAMPLES 200
 // Max number of recent contacts before they are deleted
-#define QUEUESIZE (MAX_CLOSE_CONTACT_TIME / BT_SEARCH_TIME + 1)
+#define QUEUESIZE (MAX_CONTACT_TIME / BT_SEARCH_TIME + 1)
 
 /**
  * Structs
@@ -146,7 +146,7 @@ bool mac_equality(macaddress* a, macaddress* b)
 
 // Function that prints a contact
 // Used for testing
-void print_macaddress(contact* a)
+void print_contact(contact* a)
 {
     printf("\nMac address is: ");
     for (int i = 0; i < 6; i++) {
