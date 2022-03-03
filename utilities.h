@@ -12,8 +12,8 @@
 #include <unistd.h>
 
 // The time intervals needed, sped up by 100
-#define TERMINATION_TIME 30 * 24 * 60 * 60 / 100 // 30 days in seconds
-#define BT_SEARCH_TIME 10 / 100 // 10 seconds
+#define TERMINATION_TIME 12 // 30 days in seconds
+#define BT_SEARCH_TIME 10 / 10 // 10 seconds
 #define MIN_CONTACT_TIME 4 * 60 / 100 // 4 minutes in seconds
 #define MAX_CONTACT_TIME 20 * 60 / 100 // 20 minutes in seconds
 #define REMEMBER_TIME 14 * 24 * 60 * 60 / 100 // 14 days in seconds
@@ -40,7 +40,6 @@ typedef struct {
 typedef struct {
     contact* buf;
     int buf_size;
-    int num_of_items;
     long head, tail;
     int full, empty;
     pthread_mutex_t* mut;
@@ -50,6 +49,7 @@ typedef struct {
 struct pthread_args {
     queue* close_cont_q;
     queue* recent_cont_q;
+    macaddress* addresses;
 };
 
 /**
@@ -65,7 +65,6 @@ queue* queueInit(int buf_size)
 
     q->buf_size = buf_size;
     q->buf = (contact*)malloc(buf_size * sizeof(contact));
-    q->num_of_items = 0;
     q->empty = 1;
     q->full = 0;
     q->head = 0;
@@ -101,7 +100,6 @@ void queueAdd(queue* q, contact in)
 
     q->buf[q->tail] = in;
     q->tail++;
-    q->num_of_items++;
 
     if (q->tail == q->buf_size)
         q->tail = 0;
@@ -120,7 +118,6 @@ void queueDel(queue* q, contact* out)
     }
     *out = q->buf[q->head];
 
-    q->num_of_items--;
     q->head++;
     if (q->head == q->buf_size)
         q->head = 0;
@@ -154,6 +151,45 @@ void print_contact(contact* a)
     }
     printf("\nand it's time stamp is: ");
     printf("%ld.%06ld\n", a->timestamp.tv_sec, a->timestamp.tv_usec);
+}
+
+// Function that returns the size of a queue buffer
+int find_queue_size(queue* q)
+{
+    // Return size if queue is empty or full
+    if (q->empty) {
+        return 0;
+    }
+    if (q->full) {
+        return q->buf_size;
+    }
+
+    // Size depending on the position of the tail and the head
+    if (q->head < q->tail) {
+        return (q->tail - q->head);
+    } else if (q->head > q->tail) {
+        return (q->buf_size - q->head + q->tail);
+    }
+}
+
+// Converts timeval to double
+double timeval2double(struct timeval tv)
+{
+    double tv_double = 0;
+    tv_double = (double)tv.tv_sec * 1e6 + (double)tv.tv_usec;
+    tv_double = tv_double / 1e6;
+    return tv_double;
+}
+
+// Returns the time difference of 2 timevals
+double time_difference(struct timeval start, struct timeval end)
+{
+    double time_diff;
+    // Time passed from the moment a recent contact was added in the queue
+    time_diff = (double)(end.tv_sec - start.tv_sec) * 1e6;
+    time_diff += (double)(end.tv_usec - start.tv_usec);
+    time_diff = time_diff / 1e6;
+    return time_diff;
 }
 
 #endif
