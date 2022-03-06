@@ -7,7 +7,7 @@ int main()
     printf("Creating the macaddresses\n");
     // Create file with macaddresses
     createMacaddresses();
-    char* filename = "macaddress.bin";
+    char* filename = "bin/macaddress.bin";
     FILE* fp = fopen(filename, "rb");
     if (!fp) {
         printf("Error: cannot open file macaddress.bin!\n");
