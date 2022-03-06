@@ -30,7 +30,7 @@ int main()
     arg->recent_cont_q = recent_contacts_queue;
 
     printf("Creating threads\n");
-    pthread_t threads[3];
+    pthread_t threads[4];
     int rc1, rc2, rc3, rc4;
     if ((rc1 = pthread_create(&threads[0], NULL, &timer, NULL))) {
         printf("Thread creation failed: %d\n", rc1);
@@ -47,12 +47,12 @@ int main()
         exit(-1);
     }
 
-    // if ((rc4 = pthread_create(&threads[3], NULL, &delete_contacts, arg))) {
-    //     printf("Thread creation failed: %d\n", rc4);
-    //     exit(-1);
-    // }
+    if ((rc4 = pthread_create(&threads[3], NULL, &delete_contacts, arg))) {
+        printf("Thread creation failed: %d\n", rc4);
+        exit(-1);
+    }
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
         pthread_join(threads[i], NULL);
     }
 

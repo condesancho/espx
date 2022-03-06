@@ -50,7 +50,7 @@ bool testCOVID()
 void uploadContacts(queue* close_contacts)
 {
     // If file doesn't exist create it and write
-    FILE* fp = fopen("possible_covid_cases.bin", "ab+");
+    FILE* fp = fopen("bin/possible_covid_cases.bin", "ab+");
 
     if (close_contacts->empty == 1) {
         fclose(fp);
@@ -96,37 +96,37 @@ void* timer()
         gettimeofday(&current_time, NULL);
 
         // Time passed for bt search
-        time_diff = time_difference(current_time, bluetooth_time);
+        time_diff = time_difference(bluetooth_time, current_time);
 
-        // pthread_mutex_lock(&bt_mutex);
+        pthread_mutex_lock(&bt_mutex);
         if (time_diff >= BT_SEARCH_TIME) {
-            printf("Searching\n");
+            // printf("Searching\n");
             bt_condition = 1;
             pthread_cond_signal(&bt_cond);
 
             // Reset timer
             gettimeofday(&bluetooth_time, NULL);
         }
-        // pthread_mutex_unlock(&bt_mutex);
+        pthread_mutex_unlock(&bt_mutex);
 
         // Time passed for covid test
-        time_diff = time_difference(current_time, covid_time);
+        time_diff = time_difference(covid_time, current_time);
 
-        // pthread_mutex_lock(&covid_mutex);
+        pthread_mutex_lock(&covid_mutex);
         if (time_diff >= COVID_TEST_TIME) {
-            printf("Testing\n");
+            // printf("Testing\n");
             covid_condition = 1;
             pthread_cond_signal(&covid_cond);
 
             // Reset timer
             gettimeofday(&covid_time, NULL);
         }
-        // pthread_mutex_unlock(&covid_mutex);
+        pthread_mutex_unlock(&covid_mutex);
 
         // Time passed for the termination of the program
-        time_diff = time_difference(current_time, termination_time);
-
-        // pthread_mutex_lock(&term_mutex);
+        time_diff = time_difference(termination_time, current_time);
+        // printf("time diff = %f\n", time_diff);
+        pthread_mutex_lock(&term_mutex);
         if (time_diff >= TERMINATION_TIME) {
             printf("Terminating all threads\n");
             term_condition = 1;
@@ -134,7 +134,7 @@ void* timer()
             pthread_cond_signal(&covid_cond);
             pthread_exit(NULL);
         }
-        // pthread_mutex_unlock(&term_mutex);
+        pthread_mutex_unlock(&term_mutex);
     }
 }
 
@@ -163,9 +163,9 @@ void* covid_test(void* arg)
 
         if (testCOVID()) {
             printf("Test occurred positive uploading contacts\n");
-            // pthread_mutex_lock(&close_cont->mut);
+            pthread_mutex_lock(close_cont->mut);
             uploadContacts(close_cont);
-            // pthread_mutex_unlock(&close_cont->mut);
+            pthread_mutex_unlock(close_cont->mut);
         }
     }
 }
@@ -186,12 +186,12 @@ void* bluetooth_search(void* arg)
     macaddress* addresses = args->addresses;
 
     contact in;
+    int index = 0;
 
     while (1) {
         pthread_mutex_lock(&bt_mutex);
         while (!bt_condition && !term_condition) {
             pthread_cond_wait(&bt_cond, &bt_mutex);
-            printf("yo\n");
         }
         bt_condition = 0;
         pthread_mutex_unlock(&bt_mutex);
@@ -204,7 +204,26 @@ void* bluetooth_search(void* arg)
         in.address = BTnearMe(addresses);
         gettimeofday(&in.timestamp, NULL);
 
+        pthread_mutex_lock(recent_cont->mut);
         queueAdd(recent_cont, in);
+
+        // Find duplicates
+        index = recent_cont->head;
+        // Iterate every item in the queue
+        for (int i = 0; i < find_queue_size(recent_cont) - 1; i++) {
+            // Return to start of queue if
+            if (index > recent_cont->buf_size - 1) {
+                index == 0;
+            }
+            if (close_contact_found(recent_cont->buf[index], recent_cont->buf[recent_cont->tail - 1])) {
+                printf("Close contact found\n");
+                pthread_mutex_lock(close_cont->mut);
+                queueAdd(close_cont, recent_cont->buf[recent_cont->tail - 1]);
+                pthread_mutex_unlock(close_cont->mut);
+            }
+            index++;
+        }
+        pthread_mutex_unlock(recent_cont->mut);
     }
 }
 
@@ -222,7 +241,7 @@ void* delete_contacts(void* arg)
     queue* close_cont = args->close_cont_q;
     queue* recent_cont = args->recent_cont_q;
 
-    FILE* fp = fopen("timestamps.bin", "ab+");
+    FILE* fp = fopen("bin/timestamps.bin", "w");
 
     struct timeval current_time;
     struct timeval head_timestamp;
@@ -236,32 +255,45 @@ void* delete_contacts(void* arg)
 
         // Exit thread if termination occurs
         if (term_condition) {
+            for (int i = 0; i < find_queue_size(recent_cont); i++) {
+                queueDel(recent_cont, &out);
+                // Save the timestamp of the contact to a file
+                time_stamp = timeval2double(out.timestamp);
+                fwrite(&time_stamp, sizeof(double), 1, fp);
+            }
+
             fclose(fp);
             pthread_exit(NULL);
         }
 
+        pthread_mutex_lock(recent_cont->mut);
         // Find the timestamp of the first contact in the queue
         head_timestamp = recent_cont->buf[recent_cont->head].timestamp;
 
         // Time passed from the moment a recent contact was added in the queue
-        time_diff = time_difference(current_time, head_timestamp);
-
-        if (time_diff >= MAX_CONTACT_TIME) {
+        time_diff = time_difference(head_timestamp, current_time);
+        // printf("time diff = %f\n", time_diff);
+        if (time_diff >= MAX_CONTACT_TIME && recent_cont->empty == 0) {
+            // printf("Recent contact expired\n");
             queueDel(recent_cont, &out);
             // Save the timestamp of the contact to a file
             time_stamp = timeval2double(out.timestamp);
             fwrite(&time_stamp, sizeof(double), 1, fp);
         }
+        pthread_mutex_unlock(recent_cont->mut);
 
+        pthread_mutex_lock(close_cont->mut);
         // Find the timestamp of the first close contact in the queue
         head_timestamp = close_cont->buf[close_cont->head].timestamp;
 
         // Time passed from the moment a close contact was added in the queue
-        time_diff = time_difference(current_time, head_timestamp);
+        time_diff = time_difference(head_timestamp, current_time);
 
-        if (time_diff >= REMEMBER_TIME) {
+        if (time_diff >= REMEMBER_TIME && close_cont->empty == 0) {
+            // printf("Close contact expired\n");
             queueDel(close_cont, &out);
         }
+        pthread_mutex_unlock(close_cont->mut);
 
         usleep(1000);
     }

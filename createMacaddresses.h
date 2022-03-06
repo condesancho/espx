@@ -12,7 +12,7 @@ void createMacaddresses()
 
     FILE* f;
     // Create macaddress.bin file to store the random generated mac addresses
-    f = fopen("macaddress.bin", "w");
+    f = fopen("bin/macaddress.bin", "w");
 
     if (f == NULL) {
         printf("Error: cannot open file macaddress.bin!\n");

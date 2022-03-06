@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 // The time intervals needed, sped up by 100
-#define TERMINATION_TIME 12 // 30 days in seconds
+#define TERMINATION_TIME 30 * 24 * 60 * 60 / 100 // 30 days in seconds
 #define BT_SEARCH_TIME 10 / 10 // 10 seconds
 #define MIN_CONTACT_TIME 4 * 60 / 100 // 4 minutes in seconds
 #define MAX_CONTACT_TIME 20 * 60 / 100 // 20 minutes in seconds
@@ -22,7 +22,7 @@
 // The number of macaddresses created
 #define SAMPLES 200
 // Max number of recent contacts before they are deleted
-#define QUEUESIZE (MAX_CONTACT_TIME / BT_SEARCH_TIME + 1)
+#define QUEUESIZE 200
 
 /**
  * Structs
@@ -112,10 +112,6 @@ void queueAdd(queue* q, contact in)
 
 void queueDel(queue* q, contact* out)
 {
-    if (q->empty == 1) {
-        printf("Queue is empty\nError\n");
-        exit(-1);
-    }
     *out = q->buf[q->head];
 
     q->head++;
@@ -131,6 +127,17 @@ void queueDel(queue* q, contact* out)
 /**
  * General functions
  **/
+// Returns the time difference of 2 timevals
+double time_difference(struct timeval start, struct timeval end)
+{
+    double time_diff;
+    // Time passed from the moment a recent contact was added in the queue
+    time_diff = (double)(end.tv_sec - start.tv_sec) * 1e6;
+    time_diff += (double)(end.tv_usec - start.tv_usec);
+    time_diff = time_diff / 1e6;
+    return time_diff;
+}
+
 // Checks if two macaddresses are the same
 bool mac_equality(macaddress* a, macaddress* b)
 {
@@ -139,6 +146,18 @@ bool mac_equality(macaddress* a, macaddress* b)
             return false;
     }
     return true;
+}
+
+// Finds if a new contact should be considered as a close contact
+bool close_contact_found(contact in_q, contact new_contact)
+{
+    double time_diff = time_difference(in_q.timestamp, new_contact.timestamp);
+    if (mac_equality(&in_q.address, &new_contact.address)) {
+        if (time_diff >= MIN_CONTACT_TIME && time_diff < MAX_CONTACT_TIME) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Function that prints a contact
@@ -179,17 +198,6 @@ double timeval2double(struct timeval tv)
     tv_double = (double)tv.tv_sec * 1e6 + (double)tv.tv_usec;
     tv_double = tv_double / 1e6;
     return tv_double;
-}
-
-// Returns the time difference of 2 timevals
-double time_difference(struct timeval start, struct timeval end)
-{
-    double time_diff;
-    // Time passed from the moment a recent contact was added in the queue
-    time_diff = (double)(end.tv_sec - start.tv_sec) * 1e6;
-    time_diff += (double)(end.tv_usec - start.tv_usec);
-    time_diff = time_diff / 1e6;
-    return time_diff;
 }
 
 #endif
